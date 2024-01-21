@@ -1,6 +1,6 @@
 # SAMMY-method 4f: bioinformatics analysis and plots generation
 
-In this guide it is explained which are the bioinformatic steps to perform analysis of SAMMY-seq (4f protocol) as in "Biochemical properties of chromatin domains define genome compartmentalization" paper.
+This tutorial illustrate the use of the bioinformatic pipeline to analyze SAMMY-seq (4f protocol) data as presented in the "Biochemical properties of chromatin domains define genome compartmentalization" manuscript. The code in this repository also contains scripts to obtain the figures of the same manuscript.
 
 In this repository you are going to find four main folders: 
 * `Data_processing`: where the scripts to perform the basic bioinformatics analysis starting from a fastq are stored
