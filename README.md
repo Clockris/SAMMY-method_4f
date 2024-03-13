@@ -286,7 +286,138 @@ Rscript Scripts/3.1-bw_binner.R Output_examples/03a-S3_C2C12.bw untreated 4f C2C
 Rscript Scripts/3.1-bw_binner.R Output_examples/03a-S4_C2C12.bw untreated 4f C2C12 S4 250000 20240213 mm9 Input_examples/Split_chrs/mm9_chromsizes.bed Input_examples/Split_chrs/mm9_only-canonical_chromsizes.bed Output_examples/04-Splitted_chromosomes
 ```
 
-### 3.1) Compartments and sub-comparments analysis
+### 3.1) Create compartment and subcompartment R objects
+
+**Script.** `SAMMY_Compartment_getRobject_github.R`, `SAMMY_Compartment_utilityfunction_github.R`.
+
+**Software.** `R`(suggested version 3.6.0) with the following packages: `data.table`, `GenomicRanges`, `pbapply`, `Matrix`.
+
+**Aim.** Create and store all the required `.Rdata` objects used to call compartments by chromosome.
+Namely, the following steps will be performed for each chromosome:
+1. Read and save 1-dimensional (1D) tracks (i.e., S2S, S2L, S3 and S4 fractions);
+2. Read and save 2-dimensional (2D) data (i.e., Hi-C matrix);
+3. Read 1D and 2D data, compute and save (a) correlation matrix and (b) bin coordinates;
+4. Read correlation matrices, compute eigenvectors and store the first principal component (PC1);
+5. *(optional)* Read bin coordinates and compute the chromHMM states occupancy for each bin.
+
+> [!NOTE]
+> For the compartments estimation in [*"Compute A and B compartments"*](#32-compute-a-and-b-compartments) all the steps (1, 2, 3a, 3b and 4) and the created objects are required. For subcompartment estimation in [*"Compute subcompartments"*](#33-compute-subcompartments) only step 1 is required.
+
+
+
+**Input files.**
+- SAMMY-seq bigwig files, split by chromosome (see output in [*"Preparing file for compartment calling"*](#30--preparing-file-for-compartment-calling));
+- bins table and Hi-C cooler files split by chromosome (recommend resolution 250 kb);
+- *(optional)* ChormHMM segmentation of the genome (.dense file);
+
+> [!TIP]
+> Bins table and Hi-C cooler file can be obtained with the following command ([cooler](https://cooler.readthedocs.io/en/latest/datamodel.html)):
+> ```
+> cooler dump --table bins --header --out HiC_250000_bins.txt.gz 4DNFIMDOXUT8.mcool::/resolutions/250000
+> cooler dump --range chr18:0-80373285 --balanced --header --out HiC_250000_chr18_counts.txt.gz 4DNFIMDOXUT8.mcool::/resolutions/250000
+> ```
+> Example mcool file can be downloded from [4DN portal](https://data.4dnucleome.org/files-processed/4DNFIMDOXUT8/).
+
+
+**Input variable.** Input variables can be set within the script as follow:
+```
+# <chr> Path to the main folder
+prefix.path<-"/Analysis/" 
+# <chr> Name used as prefix for the created RData objects
+prefix.name<-"Fibroblast_paper_202301_"
+
+# <chr> Bin size in bp used to create the bigwig input files
+binsize<-c("250000")
+# <chr> Chromosome to be analyzed
+CHR<-c("chr18")
+
+# <chr> Path to the folder that contains the Hi-C cooler files
+dir.hic<-paste0(prefix.path,"Data/4DN/")
+#<chr> (optional) Path to the folder that contains ChromHMM dense file 
+dir.hmm<-paste0(prefix.path,"Data/ChromHMM/")
+```
+
+**Output.** The created .RData objects will be stored in the main folder Robject/ and the correspondent subfolders. Namely, each chromosome file will contain:
+1. `Track/`: list of GenomicRanges objects.
+2. `HiC/`: list of matrix.
+3. a)`Correlation/`: list of Matrix; and b) `Bin/`: GenomicRanges object.
+4. `Eigenvector/`: list of vector.
+5. *(optional)* `Bin/`: GenomicRanges object.
+
+
+### 3.2) Compute A and B compartments
+
+**Script.** `SAMMY_Compartment_Analysis_github.R`, `SAMMY_Compartment_utilityfunction_github.R`.
+
+**Software.** `R`(suggested version 3.6.0) with the following packages: `data.table`, `GenomicRanges`, `Matrix`.
+
+**Aim.** Get A and B compartments for SAMMY-seq and Hi-C samples, compare them and summarize the results.
+
+**Input files.**
+- `Bin/` R objects (see output 3b, in [*"Create R object"*](#31-create-compartment-and-subcompartment-r-objects));
+- `Eigenvector/` R objects (see output 4, in [*"Creare R object"*](#31-create-compartment-and-subcompartment-r-objects)).
+
+**Input variables.** Input variables can be set within the script as follow:
+```
+# <chr> Bin size in bp used to create the bigwig input files and the Hi-C cooler files
+binsize<-"250000"
+# <chr> Chromosome to be analyzed
+CHR<-"chr18"
+# <boolean> If true all eigenvector will be divide by the abs(max) (visual purpose) 
+scale.egv<-TRUE
+# <chr> Name of the data used as reference, to compare with
+ref.hic<-"HiC"
+```
+
+**Output.** A bed file with genomic coordinates for each bin with a color indication of A (`#ffb344`) and B (`#00a19d`) compartment, for each experiment/sample. The output files will be stored in the subfolder `Results/Compartment/`. Summarizing plots will be saved in the folder `Plot/`.
+
+
+
+### 3.3) Compute subcompartments
+
+**Script.** `SAMMY_Subcompartment_Calder_Analysis_github.R`, `SAMMY_Subcompartment_Calder_UtilityFunctions_github.R`.
+
+**Software.** `R` (suggested version 3.6.0) with the following packages: `data.table`, `GenomicRanges`, `doParallel`, `R.utils`, `factoextra`, `maptools`, `CALDER` (version 1.0, 2020-09-01), `patchwork`, `dendextend`, `scales`.
+> [!NOTE]
+> In this step, we re-implemented some of the CALDER algorithms to accommodate the SAMMY-seq data format. We still keep the core set of functions (`remove_blank_cols`, `fast_cor`, `generate_compartments_bed`, `HighResolution2Low_k_rectangle`, `get_PCs`, `bisecting_kmeans`, `project_to_major_axis`, `get_best_reorder`, `get_cluser_levels`), with the default parameters and the steps intended in the [original method](https://github.com/CSOgroup/CALDER).
+
+
+**Aim.** Convert Hi-C cooler file in CALDER format and get the eigth sub-compartments segmentation as described in CALDER, for each SAMMY-seq and Hi-C sample.
+
+**Input files.**
+- SAMMY-seq bigwig files split for each chromosome (see point 3.1. [*"Create R object"*](#31-create-compartment-and-subcompartment-r-objects));
+- bins table and Hi-C cooler files split by chromosome (recommend resolution 50 kb).
+
+
+> [!TIP]
+> Bins table and Hi-C cooler file can be obtained with the following command ([cooler](https://cooler.readthedocs.io/en/latest/datamodel.html)):
+> ```
+> cooler dump --table bins --header --out HiC_50000_bins.txt.gz 4DNFIMDOXUT8.mcool::/resolutions/50000
+> cooler dump --range chr18:0-80373285 --balanced --header --out HiC_50000_chr18_counts.txt.gz 4DNFIMDOXUT8.mcool::/resolutions/50000
+> ```
+> Example mcool file can be downloded from [4DN portal](https://data.4dnucleome.org/files-processed/4DNFIMDOXUT8/).
+
+
+**Input variables.** Input variables can be set within the script as follow:
+```
+# <chr> Path to the main folder
+prefix.path<-"/Analysis/" 
+# <chr> Name used as prefix for the created RData objects
+prefix.name<-"Fibroblast_paper_202301_"
+
+# <chr> Track directory (see point 3.0)
+dir.track<- paste0(prefix.path,"Robjects/Track/")
+# <chr> Path to the folder that contains the Hi-C cooler files
+dir.hic<-paste0(prefix.path,"Data/4DN/")
+
+# <chr> Bin size in bp used to create the bigwig input files and the Hi-C cooler files
+binsize<-"50000"
+```
+
+
+**Output.** A bed file with genomic coordinates for each bin with color indication of A.1.1 (most open, `#1d4f60`), A.1.1. (`#1d4f60`), A.1.2 (`#36877a`), A.2.1 (`#6dbc90`), A.2.2 (`#c4e6c3`), B.1.1 (`#ecda9a`), B.1.2 (`#f3ad6a`) ,B.2.1 (`#f97b57`) and B.2.2. (`#ee4d5a`, most closed) subcompartment, for each experiment/sample. The output files will be stored in the sub folder `Results/Subcompartment/`. Summarizing plots will be saved in the folder `Plot/`.
+
+
 
 
 [^1]: This index has been produced through the command `bwa index chr15.fa.gz` performed on chromosome chr15 of mm9 genome, dowloaded from UCSC at the following [link](https://hgdownload.soe.ucsc.edu/goldenPath/mm9/chromosomes/chr15.fa.gz).
